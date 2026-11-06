@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WØEMZ Signal OS — Ham Radio Station Console & Directory</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        tactical: {
+                            950: '#070b12',
+                            900: '#0c1424',
+                            800: '#13213c',
+                            700: '#1b3056',
+                            border: '#1e3a6d',
+                            accent: '#38bdf8',
+                            amber: '#fbbf24',
+                            green: '#22c55e'
+                        }
+                    },
+                    fontFamily: {
+                        mono: ['JetBrains Mono', 'Fira Code', 'Courier New', 'monospace'],
+                        sans: ['Inter', 'system-ui', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Inter:wght@400;500;600;700&display=swap');
+
+        .lcd-glow {
+            text-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+        }
+        .amber-glow {
+            text-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
+        }
+        .custom-scroll::-webkit-scrollbar {
+            height: 6px;
+            width: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background-color: #1e3a6d;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-tactical-950 text-slate-200 min-h-screen flex flex-col font-sans selection:bg-cyan-500 selection:text-black">
+
+    <!-- TOP TELEMETRY RIBBON -->
+    <aside aria-label="Live Telemetry" class="bg-black/60 border-b border-tactical-border/70 text-xs px-4 py-2 font-mono flex flex-wrap items-center justify-between gap-4 sticky top-0 z-50 backdrop-blur-md">
+        <!-- Station Identity -->
+        <div class="flex items-center gap-3">
+            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-950/80 border border-blue-500/40 text-cyan-400 font-bold">
+                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                WØEMZ
+            </span>
+            <span class="hidden sm:inline text-slate-400">Detroit Lakes ARC — MN, USA</span>
+            <span class="hidden md:inline px-1.5 py-0.2 rounded bg-slate-800 text-[10px] text-slate-300">EST. 1956</span>
+        </div>
+
+        <!-- Clocks & Grid -->
+        <div class="flex items-center gap-4 text-[11px]">
+            <div class="flex items-center gap-1.5 bg-tactical-900 px-2 py-1 rounded border border-tactical-border/50">
+                <i data-lucide="clock" class="w-3.5 h-3.5 text-cyan-400"></i>
+                <span class="text-slate-400">UTC:</span>
+                <span id="utcClock" class="font-bold text-cyan-300 lcd-glow">00:00:00z</span>
+            </div>
+
+            <div class="hidden lg:flex items-center gap-1.5 bg-tactical-900 px-2 py-1 rounded border border-tactical-border/50">
+                <span class="text-slate-400">LOCAL:</span>
+                <span id="localClock" class="font-bold text-amber-300">00:00:00</span>
+            </div>
+
+            <div class="flex items-center gap-1.5 bg-tactical-900 px-2 py-1 rounded border border-tactical-border/50">
+                <i data-lucide="map-pin" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <span class="text-slate-400">GRID:</span>
+                <span id="gridLocator" class="font-bold text-emerald-300">EN16wt</span>
+                <button onclick="detectLocation()" title="Auto-detect via GPS" class="hover:text-white transition">
+                    <i data-lucide="crosshair" class="w-3 h-3 text-cyan-400"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Control Actions -->
+        <div class="flex items-center gap-2">
+            <button onclick="toggleAudio()" id="audioToggleBtn" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] flex items-center gap-1 border border-slate-700 transition" title="Toggle CW Sounder & Clicks">
+                <i data-lucide="volume-2" id="audioIcon" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <span class="hidden sm:inline">Audio</span>
+            </button>
+            <a href="https://www.w0emz.org/home" target="_blank" class="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold text-[11px] flex items-center gap-1 shadow transition">
+                <span>Club Web</span>
+                <i data-lucide="external-link" class="w-3 h-3"></i>
+            </a>
+        </div>
+    </aside>
+
+    <!-- PROPAGATION & SOLAR STATUS BANNER -->
+    <section aria-label="Propagation & Band Status" class="bg-tactical-900/90 border-b border-tactical-border px-4 py-3">
+        <div class="max-w-7xl mx-auto flex flex-col lg:flex-row items-center justify-between gap-4 text-xs font-mono">
+            <div class="flex items-center gap-2 overflow-x-auto w-full lg:w-auto pb-1 lg:pb-0 custom-scroll">
+                <div class="flex items-center gap-2 px-3 py-1.5 rounded bg-tactical-950 border border-tactical-border">
+                    <span class="text-amber-400 font-bold">SFI:</span>
+                    <span class="font-bold text-white">168</span>
+                </div>
+                <div class="flex items-center gap-2 px-3 py-1.5 rounded bg-tactical-950 border border-tactical-border">
+                    <span class="text-amber-400 font-bold">SN:</span>
+                    <span class="font-bold text-white">114</span>
+                </div>
+                <div class="flex items-center gap-2 px-3 py-1.5 rounded bg-tactical-950 border border-tactical-border">
+                    <span class="text-emerald-400 font-bold">A-INDEX:</span>
+                    <span class="font-bold text-white">6</span>
+                </div>
+                <div class="flex items-center gap-2 px-3 py-1.5 rounded bg-tactical-950 border border-tactical-border">
+                    <span class="text-cyan-400 font-bold">K-INDEX:</span>
+                    <span class="font-bold text-white">1 (Quiet)</span>
+                </div>
+            </div>
+
+            <!-- HF Band Conditions Summary -->
+            <div class="flex items-center gap-2 text-[11px]">
+                <span class="text-slate-400">Bands:</span>
+                <span class="px-2 py-0.5 rounded bg-emerald-950 border border-emerald-500/50 text-emerald-300 font-bold">10m-20m: GOOD</span>
+                <span class="px-2 py-0.5 rounded bg-emerald-950 border border-emerald-500/50 text-emerald-300 font-bold">40m-80m: FAIR</span>
+                <span class="px-2 py-0.5 rounded bg-blue-950 border border-blue-500/50 text-cyan-300 font-bold">Geomag: NORMAL</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- NAVIGATION TABS -->
+    <header class="max-w-7xl mx-auto w-full px-4 pt-6 pb-2">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-tactical-border pb-4">
+            <div>
+                <h1 class="text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
+                    <span class="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">THE WØEMZ SIGNAL</span>
+                    <span class="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-tactical-800 border border-tactical-border text-cyan-400">OS v2.4</span>
+                </h1>
+                <p class="text-xs text-slate-400 mt-1">Interactive Software Directory, Go-Kit Configurator & Station Sandbox</p>
+            </div>
+
+            <!-- Tab Buttons -->
+            <div class="flex items-center gap-1.5 bg-tactical-900 p-1.5 rounded-xl border border-tactical-border overflow-x-auto custom-scroll">
+                <button onclick="switchTab('directory')" id="tab-directory" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 bg-blue-600 text-white shadow">
+                    <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
+                    <span>Apps Directory</span>
+                </button>
+                <button onclick="switchTab('kitbuilder')" id="tab-kitbuilder" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-slate-400 hover:text-white transition">
+                    <i data-lucide="backpack" class="w-3.5 h-3.5"></i>
+                    <span>Go-Kit Presets</span>
+                </button>
+                <button onclick="switchTab('sandbox')" id="tab-sandbox" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-slate-400 hover:text-white transition">
+                    <i data-lucide="radio" class="w-3.5 h-3.5"></i>
+                    <span>CW & Shack Tools</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- TAB 1: SOFTWARE DIRECTORY -->
+    <main id="view-directory" class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full space-y-6">
+        <!-- SEARCH & ADVANCED FILTERS -->
+        <div class="bg-tactical-900 border border-tactical-border rounded-xl p-5 shadow-lg">
+            <div class="flex flex-col md:flex-row gap-3 items-center justify-between mb-4">
+                <div class="relative w-full md:flex-1">
+                    <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400"></i>
+                    <input type="text" id="searchInput" oninput="applyFilters()" placeholder="Search apps (e.g. FT8, NBEMS, POTA, Satellite, APRS, Morse)..." class="w-full pl-10 pr-4 py-2.5 bg-tactical-950 border border-tactical-border rounded-lg text-xs text-white focus:outline-none focus:border-cyan-400 transition">
+                </div>
+                <div class="flex items-center gap-2 w-full md:w-auto">
+                    <select id="pricingFilter" onchange="applyFilters()" class="bg-tactical-950 border border-tactical-border rounded-lg px-3 py-2.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-400">
+                        <option value="all">All Licenses</option>
+                        <option value="free">Free Only</option>
+                        <option value="freemium">Freemium / Demo</option>
+                        <option value="paid">Commercial Paid</option>
+                    </select>
+                    <button onclick="toggleFavoritesOnly()" id="favToggleBtn" class="px-3 py-2.5 bg-tactical-950 hover:bg-tactical-800 border border-tactical-border rounded-lg text-xs font-semibold text-amber-300 flex items-center gap-1.5 transition">
+                        <i data-lucide="star" class="w-3.5 h-3.5"></i>
+                        <span>Shack Favorites (<span id="favCount">0</span>)</span>
+                    </button>
+                </div>
+            </div>
+            <div class="space-y-2">
+                <div class="text-[10px] font-mono uppercase tracking-wider text-slate-400">Category Filter:</div>
+                <div class="flex gap-1.5 overflow-x-auto pb-1 custom-scroll" id="catBtnContainer"></div>
+            </div>
+            <div class="space-y-2 mt-3 pt-3 border-t border-tactical-border/60">
+                <div class="text-[10px] font-mono uppercase tracking-wider text-slate-400">Platform Filter:</div>
+                <div class="flex flex-wrap gap-1.5" id="platformBtnContainer"></div>
+            </div>
+        </div>
+        <div class="flex items-center justify-between text-xs font-mono text-slate-400 px-1">
+            <div>Showing <span id="appCount" class="text-cyan-400 font-bold">0</span> apps <span id="filterIndicator" class="text-slate-500"></span></div>
+            <button onclick="resetAllFilters()" class="text-cyan-400 hover:underline flex items-center gap-1 text-[11px]">
+                <i data-lucide="rotate-ccw" class="w-3 h-3"></i> Reset Filters
+            </button>
+        </div>
+        <div id="appGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+        <div id="noResults" class="hidden py-16 text-center bg-tactical-900/50 rounded-xl border border-tactical-border">
+            <i data-lucide="radio" class="w-10 h-10 text-slate-500 mx-auto mb-2 animate-bounce"></i>
+            <p class="text-sm font-bold text-slate-300">No applications match your criteria</p>
+            <p class="text-xs text-slate-500 mt-1">Try resetting platform or category filters.</p>
+        </div>
+    </main>
+
+    <!-- TAB 2: SHACK GO-KIT CONFIGURATOR -->
+    <section id="view-kitbuilder" class="hidden max-w-7xl mx-auto px-4 py-6 flex-1 w-full space-y-6">
+        <div class="bg-tactical-900 border border-tactical-border rounded-xl p-6">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2"><i data-lucide="backpack" class="w-5 h-5 text-amber-400"></i>Mission & Operating Kit Presets</h2>
+            <p class="text-xs text-slate-400 mt-1">Select a tactical operating profile below to auto-bundle your software kit, or check/uncheck software to export your custom Field Day package.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
+                <button onclick="loadKitPreset('pota')" class="p-3.5 rounded-lg border border-tactical-border bg-tactical-950 hover:border-emerald-400 text-left transition group">
+                    <div class="flex items-center justify-between"><span class="font-bold text-xs text-emerald-400 group-hover:underline">🌲 POTA / SOTA Roving</span><i data-lucide="compass" class="w-4 h-4 text-emerald-400"></i></div>
+                    <p class="text-[11px] text-slate-400 mt-1">HAMRS, FT8CN, PoLo, Look4Sat, RepeaterBook.</p>
+                </button>
+                <button onclick="loadKitPreset('emcomm')" class="p-3.5 rounded-lg border border-tactical-border bg-tactical-950 hover:border-red-400 text-left transition group">
+                    <div class="flex items-center justify-between"><span class="font-bold text-xs text-red-400 group-hover:underline">🚨 EmComm & ARES Go-Box</span><i data-lucide="shield-alert" class="w-4 h-4 text-red-400"></i></div>
+                    <p class="text-[11px] text-slate-400 mt-1">Winlink Express, fldigi/flmsg, Dire Wolf, Pat.</p>
+                </button>
+                <button onclick="loadKitPreset('contest')" class="p-3.5 rounded-lg border border-tactical-border bg-tactical-950 hover:border-cyan-400 text-left transition group">
+                    <div class="flex items-center justify-between"><span class="font-bold text-xs text-cyan-400 group-hover:underline">🏆 HF Contesting / DX</span><i data-lucide="trophy" class="w-4 h-4 text-cyan-400"></i></div>
+                    <p class="text-[11px] text-slate-400 mt-1">N1MM+, N3FJP, DXLab, Club Log, OmniRig.</p>
+                </button>
+                <button onclick="loadKitPreset('digital')" class="p-3.5 rounded-lg border border-tactical-border bg-tactical-950 hover:border-purple-400 text-left transition group">
+                    <div class="flex items-center justify-between"><span class="font-bold text-xs text-purple-400 group-hover:underline">💻 Modern Digital Shack</span><i data-lucide="cpu" class="w-4 h-4 text-purple-400"></i></div>
+                    <p class="text-[11px] text-slate-400 mt-1">WSJT-X, JS8Call, VarAC, Hamlib, SDR++.</p>
+                </button>
+            </div>
+        </div>
+        <div class="bg-tactical-900 border border-tactical-border rounded-xl p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-tactical-border">
+                <div><h3 class="font-bold text-sm text-white" id="currentKitTitle">Custom Field Station Bundle</h3><p class="text-xs text-slate-400">Selected apps in this profile (<span id="kitSelectedCount">0</span>)</p></div>
+                <div class="flex items-center gap-2">
+                    <button onclick="copyKitList()" class="px-3 py-1.5 rounded bg-tactical-800 hover:bg-tactical-700 text-xs font-semibold text-cyan-300 border border-tactical-border flex items-center gap-1.5 transition"><i data-lucide="copy" class="w-3.5 h-3.5"></i><span>Copy Checklist</span></button>
+                    <button onclick="exportKitJSON()" class="px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white flex items-center gap-1.5 shadow transition"><i data-lucide="download" class="w-3.5 h-3.5"></i><span>Export JSON</span></button>
+                </div>
+            </div>
+            <div id="kitItemsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4"></div>
+        </div>
+    </section>
+
+    <!-- TAB 3: CW SANDBOX & SHACK REFERENCE TOOLS -->
+    <section id="view-sandbox" class="hidden max-w-7xl mx-auto px-4 py-6 flex-1 w-full space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-tactical-900 border border-tactical-border rounded-xl p-6 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-3"><h3 class="text-base font-bold text-white flex items-center gap-2"><i data-lucide="code" class="w-5 h-5 text-amber-400"></i>Live Audio CW (Morse) Sounder</h3><span class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950 border border-amber-600/50 text-amber-300">Web Audio API</span></div>
+                    <p class="text-xs text-slate-400 mb-4">Type any text or callsign below to transmit it via simulated 700Hz sidetone. Great for practicing code reading and off-air Koch practice.</p>
+                    <div class="space-y-3">
+                        <div><label class="text-[11px] font-mono text-slate-400 block mb-1">Text to Transmit:</label><input type="text" id="cwInput" value="CQ CQ DE W0EMZ K" class="w-full px-3 py-2 bg-tactical-950 border border-tactical-border rounded-lg text-sm text-cyan-300 font-mono tracking-widest uppercase focus:outline-none focus:border-cyan-400"></div>
+                        <div class="flex items-center gap-4">
+                            <div class="flex-1"><label class="text-[11px] font-mono text-slate-400 block mb-1">Speed: <span id="wpmDisplay" class="text-cyan-400 font-bold">18</span> WPM</label><input type="range" id="wpmSlider" min="5" max="35" value="18" oninput="document.getElementById('wpmDisplay').innerText = this.value" class="w-full accent-cyan-400"></div>
+                            <div class="flex-1"><label class="text-[11px] font-mono text-slate-400 block mb-1">Tone: <span id="toneDisplay" class="text-amber-400 font-bold">700</span> Hz</label><input type="range" id="toneSlider" min="400" max="900" step="50" value="700" oninput="document.getElementById('toneDisplay').innerText = this.value" class="w-full accent-amber-400"></div>
+                        </div>
+                        <div id="morseCodeOutput" class="p-3 bg-tactical-950 rounded border border-tactical-border font-mono text-xs text-amber-300 tracking-widest break-all min-h-[42px]">-.-. --.- / -.-. --.- / -.. . / .-- ----- . -- --.. / -.-</div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 mt-5">
+                    <button onclick="playMorse()" id="cwPlayBtn" class="flex-1 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow transition"><i data-lucide="play" class="w-4 h-4"></i><span>Transmit CW Audio</span></button>
+                    <button onclick="stopMorse()" class="px-4 py-2.5 rounded-lg bg-tactical-800 hover:bg-tactical-700 text-slate-300 font-bold text-xs transition">Stop</button>
+                </div>
+            </div>
+            <div class="bg-tactical-900 border border-tactical-border rounded-xl p-6 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-white flex items-center gap-2 mb-3"><i data-lucide="compass" class="w-5 h-5 text-cyan-400"></i>Maidenhead Grid & Beam Heading Tool</h3>
+                    <p class="text-xs text-slate-400 mb-4">Calculate exact distance (miles & km) and true azimuth rotator heading between your station and any DX grid.</p>
+                    <div class="grid grid-cols-2 gap-3 mb-4">
+                        <div><label class="text-[11px] font-mono text-slate-400 block mb-1">My Grid (QTH):</label><input type="text" id="myGridInput" value="EN16wt" maxlength="6" class="w-full px-3 py-2 bg-tactical-950 border border-tactical-border rounded-lg text-xs font-mono uppercase text-emerald-400"></div>
+                        <div><label class="text-[11px] font-mono text-slate-400 block mb-1">Target DX Grid:</label><input type="text" id="targetGridInput" value="FN31" maxlength="6" class="w-full px-3 py-2 bg-tactical-950 border border-tactical-border rounded-lg text-xs font-mono uppercase text-cyan-300"></div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 text-center font-mono">
+                        <div class="p-3 rounded bg-tactical-950 border border-tactical-border"><span class="text-[10px] text-slate-400 block">AZIMUTH</span><span id="resBearing" class="text-sm font-bold text-amber-400">101° ESE</span></div>
+                        <div class="p-3 rounded bg-tactical-950 border border-tactical-border"><span class="text-[10px] text-slate-400 block">MILES</span><span id="resMiles" class="text-sm font-bold text-cyan-400">1,085 mi</span></div>
+                        <div class="p-3 rounded bg-tactical-950 border border-tactical-border"><span class="text-[10px] text-slate-400 block">KM</span><span id="resKm" class="text-sm font-bold text-white">1,746 km</span></div>
+                    </div>
+                </div>
+                <button onclick="calculateBearing()" class="w-full mt-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition"><i data-lucide="navigation" class="w-4 h-4"></i><span>Calculate Beam Bearing</span></button>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-tactical-900 border border-tactical-border rounded-xl p-5">
+                <h4 class="text-xs font-bold text-amber-400 font-mono uppercase mb-3 flex items-center gap-1.5"><i data-lucide="book-open" class="w-4 h-4"></i> Essential Amateur Q-Codes</h4>
+                <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+                    <div class="p-2 bg-tactical-950 rounded border border-tactical-border/50"><b class="text-cyan-300">QTH:</b> Station Location</div><div class="p-2 bg-tactical-950 rounded border border-tactical-border/50"><b class="text-cyan-300">QSL:</b> Acknowledge / Confirm</div>
+                    <div class="p-2 bg-tactical-950 rounded border border-tactical-border/50"><b class="text-cyan-300">QSO:</b> Radio Conversation</div><div class="p-2 bg-tactical-950 rounded border border-tactical-border/50"><b class="text-cyan-300">QRM:</b> Man-Made Interference</div>
+                    <div class="p-2 bg-tactical-950 rounded border border-tactical-border/50"><b class="text-cyan-300">QRN:</b> Natural Static Noise</div><div class="p-2 bg-tactical-950 rounded border border-tactical-border/50"><b class="text-cyan-300">QSY:</b> Change Frequency</div>
+                    <div class="p-2 bg-tactical-950 rounded border border-tactical-border/50"><b class="text-cyan-300">QRO/QRP:</b> Increase / Low Power</div><div class="p-2 bg-tactical-950 rounded border border-tactical-border/50"><b class="text-cyan-300">QRZ?:</b> Who is calling me?</div>
+                </div>
+            </div>
+            <div class="bg-tactical-900 border border-tactical-border rounded-xl p-5">
+                <h4 class="text-xs font-bold text-cyan-400 font-mono uppercase mb-3 flex items-center gap-1.5"><i data-lucide="mic" class="w-4 h-4"></i> ITU Phonetic Alphabet</h4>
+                <div class="grid grid-cols-3 sm:grid-cols-4 gap-1.5 text-[11px] font-mono text-slate-300">
+                    <div><b>A</b>: Alfa</div><div><b>B</b>: Bravo</div><div><b>C</b>: Charlie</div><div><b>D</b>: Delta</div>
+                    <div><b>E</b>: Echo</div><div><b>F</b>: Foxtrot</div><div><b>G</b>: Golf</div><div><b>H</b>: Hotel</div>
+                    <div><b>I</b>: India</div><div><b>J</b>: Juliett</div><div><b>K</b>: Kilo</div><div><b>L</b>: Lima</div>
+                    <div><b>M</b>: Mike</div><div><b>N</b>: November</div><div><b>O</b>: Oscar</div><div><b>P</b>: Papa</div>
+                    <div><b>Q</b>: Quebec</div><div><b>R</b>: Romeo</div><div><b>S</b>: Sierra</div><div><b>T</b>: Tango</div>
+                    <div><b>U</b>: Uniform</div><div><b>V</b>: Victor</div><div><b>W</b>: Whiskey</div><div><b>X</b>: X-ray</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="bg-black/80 border-t border-tactical-border/80 text-slate-500 text-xs py-6 mt-12 font-mono">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+            <div><p class="text-slate-300 font-bold">Detroit Lakes Amateur Radio Club (WØEMZ)</p><p class="text-[11px]">Celebrating amateur radio service and community preparedness since 1956.</p></div>
+            <div class="flex items-center gap-4 text-[11px]">
+                <a href="https://www.w0emz.org/home" target="_blank" class="text-cyan-400 hover:underline">Official Club Portal</a><span>•</span>
+                <a href="https://sourceforge.net/directory/ham-radio/" target="_blank" class="text-slate-400 hover:text-white">SourceForge Open Source Ham Repo</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- APP ENGINE SCRIPT -->
+    <script>
+        const APPS_DATABASE = [
+            { id: "wsjtx", name: "WSJT-X", cat: "Digital Modes", platforms: ["windows", "linux", "macos"], price: "free", desc: "The gold standard for FT8, FT4, Q65 and weak-signal protocols.", url: "https://wsjt.sourceforge.io/wsjtx.html" },
+            { id: "js8call", name: "JS8Call", cat: "Digital Modes", platforms: ["windows", "linux", "macos"], price: "free", desc: "Keyboard-to-keyboard ragchew messaging and relays built on FT8 modulation.", url: "http://js8call.com/" },
+            { id: "fldigi", name: "fldigi / NBEMS", cat: "Digital Modes", platforms: ["windows", "linux", "macos"], price: "free", desc: "Multi-mode digital modem (PSK31, RTTY, Olivia) with flmsg ICS message forms.", url: "http://www.w1hkj.com/" },
+            { id: "jtdx", name: "JTDX", cat: "Digital Modes", platforms: ["windows", "linux"], price: "free", desc: "Optimized FT8/FT4 decoder tailored for crowded band conditions and weak DX signals.", url: "https://www.jtdx.tech/" },
+            { id: "varac", name: "VarAC", cat: "Digital Modes", platforms: ["windows"], price: "free", desc: "HF keyboard chat and file transfer application over VARA HF modems.", url: "https://www.varac-hamradio.com/" },
+            { id: "ft8cn", name: "FT8CN", cat: "Digital Modes", platforms: ["android"], price: "free", desc: "Complete native FT8 decoder/transmitter on Android phones via USB OTG or audio cable.", url: "https://github.com/n0boy/ft8cn" },
+            { id: "qft8", name: "qFT8 / SimpleFT8", cat: "Digital Modes", platforms: ["android"], price: "free", desc: "Lightweight FT8/FT4 receive and transmit with direct CAT rig control on Android.", url: "https://github.com/kg5d/qFT8" },
+            { id: "pocketft8", name: "Pocket FT8", cat: "Digital Modes", platforms: ["ios", "macos"], price: "free", desc: "Full FT8 transceiver with logbook for iOS, iPadOS and Apple Silicon Mac.", url: "https://apps.apple.com/us/app/pocket-ft8/id1573031024" },
+            { id: "ftham", name: "FT Ham", cat: "Digital Modes", platforms: ["ios"], price: "freemium", desc: "iOS audio DSP decoder and transmitter for FT8/FT4 with live waterfall display.", url: "https://ftham.turrion.dev/" },
+            { id: "greylineft8", name: "Greyline FT8", cat: "Digital Modes", platforms: ["ios"], price: "freemium", desc: "Tactical field-optimized FT8/FT4 application designed for portable Apple devices.", url: "https://apps.apple.com/us/app/greyline-ft8/id6773455172" },
+            { id: "winlink", name: "Winlink Express", cat: "Emergency", platforms: ["windows"], price: "free", desc: "Worldwide radio email messaging system operating over HF VARA, Packet, and Telnet.", url: "https://www.winlink.org/" },
+            { id: "pat", name: "Pat Winlink", cat: "Emergency", platforms: ["windows", "linux", "macos"], price: "free", desc: "Modern, open-source cross-platform Winlink client accessible via standard web browser.", url: "https://getpat.io/" },
+            { id: "log4om", name: "Log4OM", cat: "Logging", platforms: ["windows"], price: "free", desc: "Rich general logger with dual-radio CAT control, awards, and automatic web uploads.", url: "https://www.log4om.com/" },
+            { id: "n1mm", name: "N1MM Logger+", cat: "Logging", platforms: ["windows"], price: "free", desc: "The definitive open contest logging engine supporting CW, SSB, and digital competitions.", url: "https://n1mm.hamdocs.com/" },
+            { id: "n3fjp", name: "N3FJP Software", cat: "Logging", platforms: ["windows"], price: "paid", desc: "ACLog and the beloved ARRL Field Day, Winter Field Day, and State QSO Party suites.", url: "https://www.n3fjp.com/" },
+            { id: "dxlab", name: "DXLab Suite", cat: "Logging", platforms: ["windows"], price: "free", desc: "8-module interoperable powerhouse for DXing, automated spotting, and QSL chasing.", url: "https://www.dxlabsuite.com/" },
+            { id: "hrd", name: "Ham Radio Deluxe", cat: "Logging", platforms: ["windows"], price: "paid", desc: "Commercial integrated package: CAT rig control, DX logbook, digital modem & rotors.", url: "https://www.ham-radio-deluxe.com/" },
+            { id: "logger32", name: "Logger32", cat: "Logging", platforms: ["windows"], price: "free", desc: "Highly customizable 32-bit Windows logger with telnet DX cluster and real-time maps.", url: "https://www.logger32.net/" },
+            { id: "cqrlog", name: "CQRLOG", cat: "Logging", platforms: ["linux"], price: "free", desc: "Advanced Linux logging system powered by MySQL and Hamlib rig control backend.", url: "https://www.cqrlog.com/" },
+            { id: "klog", name: "KLog", cat: "Logging", platforms: ["linux", "windows"], price: "free", desc: "Open-source cross-platform logger built with Qt for Linux and Windows operators.", url: "https://www.klog.karloph.com/" },
+            { id: "not1mm", name: "Not1MM", cat: "Logging", platforms: ["linux"], price: "free", desc: "Contest logging application developed natively for Linux workstations.", url: "https://github.com/mbridak/not1mm" },
+            { id: "wavelog", name: "Wavelog", cat: "Logging", platforms: ["web"], price: "free", desc: "Modern self-hosted PHP/MySQL online logbook; great for shared club call stations.", url: "https://www.wavelog.org/" },
+            { id: "cloudlog", name: "Cloudlog", cat: "Logging", platforms: ["web"], price: "free", desc: "Modern cloud-native web logging platform accessible from phone, tablet, and PC.", url: "https://cloudlog.org/" },
+            { id: "ham2kpolo", name: "Ham2K PoLo", cat: "Logging", platforms: ["ios", "android"], price: "free", desc: "Ultra-fast portable logger built exclusively for POTA/SOTA park activations.", url: "https://polo.ham2k.com/" },
+            { id: "wrl", name: "World Radio League", cat: "Logging", platforms: ["ios", "web"], price: "free", desc: "Modern web & iOS logging platform with integrated POTA spotting and cloud sync.", url: "https://worldradioleague.com/" },
+            { id: "hamrs", name: "HAMRS", cat: "Logging", platforms: ["ios", "android", "windows", "linux", "macos"], price: "freemium", desc: "Cross-platform portable contact logger with pre-built POTA, SOTA, and Field Day modes.", url: "https://hamrs.app/" },
+            { id: "hamlog", name: "HamLog", cat: "Logging", platforms: ["ios"], price: "paid", desc: "Comprehensive iOS logging, solar index, tool suite, and callsign lookup app.", url: "https://apps.apple.com/us/app/hamlog/id411282466" },
+            { id: "qrz", name: "QRZ.com", cat: "Logging", platforms: ["web"], price: "freemium", desc: "World standard callsign lookup database and web-connected contact logbook.", url: "https://www.qrz.com/" },
+            { id: "lotw", name: "Logbook of The World", cat: "Logging", platforms: ["web"], price: "free", desc: "ARRL official cryptographic contact verification system for DXCC and WAS.", url: "https://lotw.arrl.org/" },
+            { id: "clublog", name: "Club Log", cat: "Logging", platforms: ["web"], price: "free", desc: "Global DXCC league tables, callsign exception analysis, and OQRS QSL matching.", url: "https://clublog.org/" },
+            { id: "hamlib", name: "Hamlib", cat: "Rig Control", platforms: ["windows", "linux", "macos"], price: "free", desc: "The universal open library providing backend CAT control for hundreds of transceivers.", url: "https://github.com/Hamlib/Hamlib" },
+            { id: "omnirig", name: "OmniRig", cat: "Rig Control", platforms: ["windows"], price: "free", desc: "Multi-client COM component allowing several logging apps to share one radio port.", url: "http://www.dxatlas.com/omnirig/" },
+            { id: "chirp", name: "CHIRP", cat: "Rig Control", platforms: ["windows", "linux", "macos"], price: "free", desc: "Standard cross-platform tool to clone and program memory channels into HTs and mobiles.", url: "https://chirp.danplanet.com/" },
+            { id: "rtsystems", name: "RT Systems", cat: "Rig Control", platforms: ["windows"], price: "paid", desc: "Commercial custom programming software and cables guaranteed to interface flawlessly.", url: "https://www.rtsystemsinc.com/" },
+            { id: "sdrpp", name: "SDR++", cat: "SDR", platforms: ["windows", "linux", "macos"], price: "free", desc: "Fast, bloat-free cross-platform SDR receiver software supporting diverse hardware.", url: "https://www.sdrplusplus.com/" },
+            { id: "sdrsharp", name: "SDR#", cat: "SDR", platforms: ["windows"], price: "free", desc: "Leading Windows SDR software with high-performance digital signal processing algorithms.", url: "https://airspy.com/download/" },
+            { id: "gqrx", name: "GQRX", cat: "SDR", platforms: ["linux", "macos"], price: "free", desc: "Open-source SDR receiver powered by GNU Radio and the Qt graphical toolkit.", url: "https://gqrx.dk/" },
+            { id: "openwebrx", name: "OpenWebRX+", cat: "SDR", platforms: ["linux", "web"], price: "free", desc: "Host a multi-user browser-accessible SDR web service with built-in digital decoders.", url: "https://www.openwebrx.de/" },
+            { id: "websdr", name: "WebSDR", cat: "SDR", platforms: ["web"], price: "free", desc: "Tune and listen to live HF/VHF radio receivers around the world via any browser.", url: "http://www.websdr.org/" },
+            { id: "gpredict", name: "Gpredict", cat: "Satellites", platforms: ["windows", "linux", "macos"], price: "free", desc: "Real-time satellite tracking, Doppler frequency shift calculation and rotator controller.", url: "http://gpredict.oz9aec.net/" },
+            { id: "look4sat", name: "Look4Sat", cat: "Satellites", platforms: ["android"], price: "free", desc: "Amateur satellite pass predictor, polar footprint chart, and TLE updater for Android.", url: "https://github.com/rtlsdrblog/look4sat" },
+            { id: "amsat", name: "AMSAT Tools", cat: "Satellites", platforms: ["web"], price: "free", desc: "Official AMSAT live transponder status reports, orbital elements, and pass times.", url: "https://www.amsat.org/" },
+            { id: "xastir", name: "Xastir", cat: "APRS", platforms: ["linux"], price: "free", desc: "Full-scale graphical APRS station tracker and mapper for Linux workstations.", url: "http://www.xastir.org/" },
+            { id: "direwolf", name: "Dire Wolf", cat: "APRS", platforms: ["windows", "linux"], price: "free", desc: "Remarkable soundcard software TNC and APRS digipeater/IGate with unmatched decoding.", url: "https://github.com/wb2osz/direwolf" },
+            { id: "aprsdroid", name: "APRSdroid", cat: "APRS", platforms: ["android"], price: "free", desc: "Position beaconing, tactical messaging, and map tracking for Android devices.", url: "https://aprsdroid.org/" },
+            { id: "aprsfi", name: "aprs.fi", cat: "APRS", platforms: ["web"], price: "free", desc: "Live Google Maps based global APRS vehicle, weather, and telemetry search engine.", url: "https://aprs.fi/" },
+            { id: "repeaterbook", name: "RepeaterBook", cat: "Field & Reference", platforms: ["ios", "android", "web"], price: "freemium", desc: "Worldwide amateur repeater directory featuring offline GPS radius queries.", url: "https://www.repeaterbook.com/" },
+            { id: "hamalert", name: "HamAlert", cat: "Field & Reference", platforms: ["ios", "android", "web"], price: "free", desc: "Receive immediate push notifications when target DX or POTA calls appear on clusters.", url: "https://www.hamalert.org/" },
+            { id: "pota", name: "POTA.app", cat: "Field & Reference", platforms: ["web"], price: "free", desc: "Official Parks on the Air portal: live activator spot alerts, park maps, and hunters.", url: "https://pota.app/" },
+            { id: "sota", name: "SOTA Database", cat: "Field & Reference", platforms: ["web"], price: "free", desc: "Summits on the Air registry: worldwide peaks, summits list, alerts, and awards.", url: "https://www.sota.org.uk/" },
+            { id: "voacap", name: "VOACAP Online", cat: "Field & Reference", platforms: ["web"], price: "free", desc: "High-accuracy HF point-to-point ionospheric propagation and circuit reliability tool.", url: "https://www.voacap.com/hf/" },
+            { id: "echolink", name: "EchoLink", cat: "Field & Reference", platforms: ["windows", "ios", "android"], price: "free", desc: "VoIP network connecting licensed operators to repeaters worldwide via phone or PC.", url: "https://www.echolink.org/" },
+            { id: "4nec2", name: "4nec2", cat: "Antennas", platforms: ["windows"], price: "free", desc: "NEC2/NEC4 antenna modeling software with 3D radiation pattern visualization.", url: "https://www.qsl.net/4nec2/" },
+            { id: "eznec", name: "EZNEC", cat: "Antennas", platforms: ["windows"], price: "free", desc: "Roy Lewallen's famous antenna analysis and modeling tool (now available fully free).", url: "https://www.eznec.com/" },
+            { id: "hamstudy", name: "HamStudy.org", cat: "Learning", platforms: ["web", "ios", "android"], price: "free", desc: "Adaptive flashcards and testing for Technician, General, and Extra FCC exam pools.", url: "https://hamstudy.org/" },
+            { id: "hamradioprep", name: "Ham Radio Prep", cat: "Learning", platforms: ["ios", "web"], price: "freemium", desc: "Structured video courses and prep exams for US ham radio licensing.", url: "https://hamradioprep.com/" },
+            { id: "lcwo", name: "LCWO.net", cat: "Learning", platforms: ["web"], price: "free", desc: "Learn Morse Code Online using the Koch method with customizable speeds.", url: "https://lcwo.net/" },
+            { id: "kochtrainer", name: "Koch Trainer", cat: "Learning", platforms: ["android"], price: "free", desc: "Dedicated Morse code trainer app for mobile practice on Android.", url: "https://play.google.com/store/apps/details?id=com.commonsourcelab.learnMorseWithKoch" }
+        ];
+
+        const KIT_PRESETS = {
+            pota: { title: "🌲 Parks on the Air (POTA / SOTA) Roving Kit", apps: ["hamrs", "ft8cn", "ham2kpolo", "repeaterbook", "look4sat", "pota", "sota"] },
+            emcomm: { title: "🚨 Emergency & ARES Deployment Go-Box", apps: ["winlink", "pat", "fldigi", "direwolf", "aprsdroid", "repeaterbook"] },
+            contest: { title: "🏆 HF Contesting & DX Chaser Workstation", apps: ["n1mm", "n3fjp", "dxlab", "clublog", "omnirig", "hamalert", "voacap"] },
+            digital: { title: "💻 Weak Signal & Digital Soundcard Station", apps: ["wsjtx", "js8call", "varac", "jtdx", "hamlib", "sdrpp"] }
+        };
+
+        const MORSE_MAP = {
+            'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 'F': '..-.', 'G': '--.', 'H': '....', 'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..', 'M': '--', 'N': '-.', 'O': '---', 'P': '.--.', 'Q': '--.-', 'R': '.-.', 'S': '...', 'T': '-', 'U': '..-', 'V': '...-', 'W': '.--', 'X': '-..-', 'Y': '-.--', 'Z': '--..', '0': '-----', '1': '.----', '2': '..---', '3': '...--', '4': '....-', '5': '.....', '6': '-....', '7': '--...', '8': '---..', '9': '----.', ' ': '/', '?': '..--..', '/': '-..-.', '.': '.-.-.-'
+        };
+
+        let activeCategory = 'all';
+        let activePlatform = 'all';
+        let showFavoritesOnly = false;
+        let soundEnabled = true;
+        let selectedKitApps = new Set(KIT_PRESETS.pota.apps);
+        let favorites = JSON.parse(localStorage.getItem('w0emz_favorites') || '[]');
+        let audioCtx = null;
+        let isMorsePlaying = false;
+        let morseTimeouts = [];
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initClock();
+            initFilterButtons();
+            applyFilters();
+            renderKitChecklist();
+            updateFavBadge();
+            lucide.createIcons();
+            initMorseWatcher();
+        });
+
+        function initClock() {
+            function update() {
+                const now = new Date();
+                document.getElementById('utcClock').textContent = now.toISOString().slice(11, 19) + 'z';
+                document.getElementById('localClock').textContent = now.toLocaleTimeString();
+            }
+            update();
+            setInterval(update, 1000);
+        }
+
+        function switchTab(tabId) {
+            playAudioBeep(600, 0.03);
+            ['directory', 'kitbuilder', 'sandbox'].forEach(t => {
+                document.getElementById(`view-${t}`).classList.add('hidden');
+                document.getElementById(`tab-${t}`).classList.remove('bg-blue-600', 'text-white', 'shadow');
+                document.getElementById(`tab-${t}`).classList.add('text-slate-400');
+            });
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-${tabId}`);
+            activeBtn.classList.add('bg-blue-600', 'text-white', 'shadow');
+            activeBtn.classList.remove('text-slate-400');
+            lucide.createIcons();
+        }
+
+        function getAudioContext() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            return audioCtx;
+        }
+
+        function playAudioBeep(freq = 700, duration = 0.05) {
+            if (!soundEnabled) return;
+            try {
+                const ctx = getAudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, ctx.currentTime);
+                gain.gain.setValueAtTime(0.08, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + duration);
+            } catch(e) {}
+        }
+
+        function toggleAudio() {
+            soundEnabled = !soundEnabled;
+            const icon = document.getElementById('audioIcon');
+            if (soundEnabled) {
+                icon.className = "w-3.5 h-3.5 text-emerald-400";
+                playAudioBeep(800, 0.05);
+            } else {
+                icon.className = "w-3.5 h-3.5 text-slate-500";
+            }
+        }
+
+        function detectLocation() {
+            playAudioBeep(900, 0.05);
+            if (!navigator.geolocation) {
+                alert("Geolocation is not supported by your browser.");
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(pos => {
+                const grid = latLonToGrid(pos.coords.latitude, pos.coords.longitude);
+                document.getElementById('gridLocator').textContent = grid;
+                document.getElementById('myGridInput').value = grid;
+                calculateBearing();
+                playAudioBeep(1200, 0.1);
+            }, () => alert("Could not access location. Defaulting to WØEMZ Club Station (EN16wt)."));
+        }
+
+        function latLonToGrid(lat, lon) {
+            const adjLat = lat + 90;
+            const adjLon = lon + 180;
+            const field1 = String.fromCharCode(65 + Math.floor(adjLon / 20));
+            const field2 = String.fromCharCode(65 + Math.floor(adjLat / 10));
+            const square1 = Math.floor((adjLon % 20) / 2);
+            const square2 = Math.floor((adjLat % 10) / 1);
+            const sub1 = String.fromCharCode(97 + Math.floor((adjLon % 2) * 12));
+            const sub2 = String.fromCharCode(97 + Math.floor((adjLat % 1) * 24));
+            return `${field1}${field2}${square1}${square2}${sub1}${sub2}`;
+        }
+
+        function gridToLatLon(grid) {
+            grid = grid.toUpperCase().trim();
+            const lon = (grid.charCodeAt(0) - 65) * 20 + parseInt(grid[2]) * 2 - 180 + 1;
+            const lat = (grid.charCodeAt(1) - 65) * 10 + parseInt(grid[3]) * 1 - 90 + 0.5;
+            return { lat, lon };
+        }
+
+        function calculateBearing() {
+            playAudioBeep(750, 0.05);
+            try {
+                const c1 = gridToLatLon(document.getElementById('myGridInput').value.trim());
+                const c2 = gridToLatLon(document.getElementById('targetGridInput').value.trim());
+                if (!c1 || !c2) return;
+                const R = 6371;
+                const dLat = (c2.lat - c1.lat) * Math.PI / 180;
+                const dLon = (c2.lon - c1.lon) * Math.PI / 180;
+                const lat1 = c1.lat * Math.PI / 180;
+                const lat2 = c2.lat * Math.PI / 180;
+                const a = Math.sin(dLat / 2) ** 2 + Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                const dKm = Math.round(R * c);
+                const dMi = Math.round(dKm * 0.621371);
+                const y = Math.sin(dLon) * Math.cos(lat2);
+                const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+                const brng = Math.round((Math.atan2(y, x) * 180 / Math.PI + 360) % 360);
+                const dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+                document.getElementById('resBearing').textContent = `${brng}° ${dirs[Math.round(brng / 22.5) % 16]}`;
+                document.getElementById('resMiles').textContent = `${dMi.toLocaleString()} mi`;
+                document.getElementById('resKm').textContent = `${dKm.toLocaleString()} km`;
+            } catch(e) {}
+        }
+
+        function initFilterButtons() {
+            const categories = ["all", ...new Set(APPS_DATABASE.map(a => a.cat))];
+            const platforms = ["all", "windows", "linux", "macos", "ios", "android", "web"];
+            document.getElementById('catBtnContainer').innerHTML = categories.map(cat => `
+                <button onclick="setCategory('${cat}')" id="cat-btn-${cat.replace(/\s+/g,'')}" class="whitespace-nowrap px-3 py-1 rounded text-[11px] font-mono border transition ${activeCategory === cat ? 'bg-cyan-500 text-black border-cyan-400 font-bold' : 'bg-tactical-950 text-slate-300 border-tactical-border hover:border-cyan-400'}">
+                    ${cat === 'all' ? 'All Categories' : cat}
+                </button>
+            `).join('');
+            document.getElementById('platformBtnContainer').innerHTML = platforms.map(plat => `
+                <button onclick="setPlatform('${plat}')" id="plat-btn-${plat}" class="px-2.5 py-1 rounded text-[11px] font-mono border transition capitalize ${activePlatform === plat ? 'bg-cyan-500 text-black border-cyan-400 font-bold' : 'bg-tactical-950 text-slate-300 border-tactical-border hover:border-cyan-400'}">
+                    ${plat === 'all' ? 'All OS' : plat}
+                </button>
+            `).join('');
+        }
+
+        function setCategory(cat) { playAudioBeep(650, 0.02); activeCategory = cat; initFilterButtons(); applyFilters(); }
+        function setPlatform(plat) { playAudioBeep(650, 0.02); activePlatform = plat; initFilterButtons(); applyFilters(); }
+
+        function toggleFavoritesOnly() {
+            playAudioBeep(800, 0.04);
+            showFavoritesOnly = !showFavoritesOnly;
+            const btn = document.getElementById('favToggleBtn');
+            if (showFavoritesOnly) btn.classList.add('bg-amber-950', 'border-amber-400', 'text-amber-300');
+            else btn.classList.remove('bg-amber-950', 'border-amber-400');
+            applyFilters();
+        }
+
+        function resetAllFilters() {
+            playAudioBeep(500, 0.05);
+            activeCategory = 'all'; activePlatform = 'all'; showFavoritesOnly = false;
+            document.getElementById('searchInput').value = '';
+            document.getElementById('pricingFilter').value = 'all';
+            document.getElementById('favToggleBtn').classList.remove('bg-amber-950', 'border-amber-400');
+            initFilterButtons(); applyFilters();
+        }
+
+        function applyFilters() {
+            const query = document.getElementById('searchInput').value.toLowerCase().trim();
+            const pricing = document.getElementById('pricingFilter').value;
+            const filtered = APPS_DATABASE.filter(app => {
+                const matchesQuery = app.name.toLowerCase().includes(query) || app.desc.toLowerCase().includes(query) || app.cat.toLowerCase().includes(query) || app.platforms.some(p => p.includes(query));
+                return matchesQuery && (activeCategory === 'all' || app.cat === activeCategory) && (activePlatform === 'all' || app.platforms.includes(activePlatform)) && (pricing === 'all' || app.price === pricing) && (!showFavoritesOnly || favorites.includes(app.id));
+            });
+            document.getElementById('appCount').textContent = filtered.length;
+            const grid = document.getElementById('appGrid');
+            const noRes = document.getElementById('noResults');
+            if (filtered.length === 0) { grid.innerHTML = ''; noRes.classList.remove('hidden'); return; }
+            noRes.classList.add('hidden');
+            grid.innerHTML = filtered.map(app => {
+                const isFav = favorites.includes(app.id);
+                return `
+                    <div class="bg-tactical-900 border border-tactical-border hover:border-cyan-500/70 rounded-xl p-4 flex flex-col justify-between transition-all duration-200 group shadow">
+                        <div><div class="flex items-start justify-between gap-2 mb-1.5"><h3 class="text-sm font-bold text-white group-hover:text-cyan-300 transition flex items-center gap-1.5">${app.name}</h3><div class="flex items-center gap-1">${getLicenseBadge(app.price)}<button onclick="toggleFav('${app.id}')" title="Save Favorite" class="p-1 hover:text-amber-400 transition"><i data-lucide="star" class="w-3.5 h-3.5 ${isFav ? 'text-amber-400 fill-amber-400' : 'text-slate-600'}"></i></button></div></div><div class="text-[10px] font-mono text-cyan-400 uppercase tracking-wider mb-2">${app.cat}</div><p class="text-xs text-slate-400 leading-relaxed mb-3">${app.desc}</p></div>
+                        <div><div class="flex flex-wrap gap-1 mb-3">${app.platforms.map(p => `<span class="px-1.5 py-0.5 rounded bg-tactical-950 border border-tactical-border text-[9px] font-mono uppercase text-slate-300">${p}</span>`).join('')}</div><a href="${app.url}" target="_blank" class="w-full py-2 rounded-lg bg-tactical-950 hover:bg-blue-600 border border-tactical-border hover:border-blue-500 text-slate-200 hover:text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition"><span>Launch Software</span><i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i></a></div>
+                    </div>`;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        function getLicenseBadge(price) {
+            if (price === 'free') return '<span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-600/50 text-emerald-400 uppercase">Free</span>';
+            if (price === 'freemium') return '<span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-950 border border-amber-600/50 text-amber-400 uppercase">Freemium</span>';
+            return '<span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-950 border border-rose-600/50 text-rose-400 uppercase">Paid</span>';
+        }
+
+        function toggleFav(id) {
+            playAudioBeep(850, 0.03);
+            favorites = favorites.includes(id) ? favorites.filter(f => f !== id) : [...favorites, id];
+            localStorage.setItem('w0emz_favorites', JSON.stringify(favorites));
+            updateFavBadge(); applyFilters();
+        }
+        function updateFavBadge() { document.getElementById('favCount').textContent = favorites.length; }
+
+        function loadKitPreset(key) {
+            playAudioBeep(900, 0.05);
+            const preset = KIT_PRESETS[key];
+            document.getElementById('currentKitTitle').textContent = preset.title;
+            selectedKitApps = new Set(preset.apps); renderKitChecklist();
+        }
+        function toggleKitItem(id) {
+            playAudioBeep(700, 0.02);
+            if (selectedKitApps.has(id)) selectedKitApps.delete(id); else selectedKitApps.add(id);
+            renderKitChecklist();
+        }
+        function renderKitChecklist() {
+            const container = document.getElementById('kitItemsContainer');
+            document.getElementById('kitSelectedCount').textContent = selectedKitApps.size;
+            container.innerHTML = APPS_DATABASE.map(app => {
+                const checked = selectedKitApps.has(app.id);
+                return `<label class="flex items-start gap-2.5 p-2.5 rounded-lg border transition cursor-pointer ${checked ? 'bg-tactical-950 border-cyan-500/60' : 'bg-tactical-950/40 border-tactical-border/60 opacity-60'}"><input type="checkbox" onchange="toggleKitItem('${app.id}')" ${checked ? 'checked' : ''} class="mt-1 accent-cyan-400 rounded"><div class="flex-1 min-w-0"><div class="flex items-center justify-between"><span class="text-xs font-bold text-white truncate">${app.name}</span><span class="text-[9px] font-mono text-cyan-400 uppercase">${app.cat}</span></div><p class="text-[11px] text-slate-400 truncate">${app.desc}</p></div></label>`;
+            }).join('');
+        }
+        function copyKitList() {
+            playAudioBeep(1100, 0.05);
+            const list = Array.from(selectedKitApps).map(id => { const a = APPS_DATABASE.find(x => x.id === id); return `- ${a.name} (${a.cat}): ${a.url}`; }).join('\n');
+            navigator.clipboard.writeText(`WØEMZ Ham Radio Kit Checklist:\n` + list);
+            alert("Checklist copied to clipboard!");
+        }
+        function exportKitJSON() {
+            playAudioBeep(1100, 0.05);
+            const bundle = Array.from(selectedKitApps).map(id => APPS_DATABASE.find(x => x.id === id));
+            const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `w0emz-shack-kit-${Date.now()}.json`; a.click();
+        }
+        function textToMorse(text) { return text.toUpperCase().split('').map(ch => MORSE_MAP[ch] || '').join(' '); }
+        function initMorseWatcher() {
+            document.getElementById('cwInput').addEventListener('input', () => {
+                document.getElementById('morseCodeOutput').textContent = textToMorse(document.getElementById('cwInput').value) || '(Enter text)';
+            });
+        }
+        function playMorse() {
+            if (isMorsePlaying) return;
+            const text = document.getElementById('cwInput').value.trim();
+            if (!text) return;
+            const wpm = parseInt(document.getElementById('wpmSlider').value) || 18;
+            const freq = parseInt(document.getElementById('toneSlider').value) || 700;
+            const dotDuration = 1.2 / wpm;
+            const ctx = getAudioContext();
+            isMorsePlaying = true;
+            document.getElementById('cwPlayBtn').classList.add('bg-amber-600', 'animate-pulse');
+            let currentTime = ctx.currentTime + 0.05;
+            const code = textToMorse(text);
+            for (const symbol of code) {
+                if (symbol === '.') { scheduleTone(currentTime, dotDuration, freq); currentTime += dotDuration * 2; }
+                else if (symbol === '-') { scheduleTone(currentTime, dotDuration * 3, freq); currentTime += dotDuration * 4; }
+                else if (symbol === ' ') currentTime += dotDuration * 2;
+                else if (symbol === '/') currentTime += dotDuration * 4;
+            }
+            const tId = setTimeout(stopMorse, (currentTime - ctx.currentTime) * 1000);
+            morseTimeouts.push(tId);
+        }
+        function scheduleTone(startTime, duration, freq) {
+            const ctx = getAudioContext();
+            const osc = ctx.createOscillator(); const gain = ctx.createGain();
+            osc.type = 'sine'; osc.frequency.setValueAtTime(freq, startTime);
+            gain.gain.setValueAtTime(0.0001, startTime);
+            gain.gain.linearRampToValueAtTime(0.12, startTime + 0.004);
+            gain.gain.setValueAtTime(0.12, startTime + duration - 0.004);
+            gain.gain.linearRampToValueAtTime(0.0001, startTime + duration);
+            osc.connect(gain); gain.connect(ctx.destination); osc.start(startTime); osc.stop(startTime + duration);
+        }
+        function stopMorse() {
+            morseTimeouts.forEach(t => clearTimeout(t)); morseTimeouts = []; isMorsePlaying = false;
+            document.getElementById('cwPlayBtn').classList.remove('bg-amber-600', 'animate-pulse');
+            if (audioCtx) { audioCtx.close(); audioCtx = null; }
+        }
+    </script>
+</body>
+</html>
